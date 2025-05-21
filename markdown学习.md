@@ -1,12 +1,41 @@
 <style>
-    <link rel="stylesheet" href="style.css">
+h1 {
+    text-align: center;
+    font-size: 30px !important;
+}
+
+h2 {
+    font-size: 26px !important;
+}
+
+h3 {
+    font-size: 22px !important;
+    text-indent: 1em;
+}
+
+h4 {
+    font-size: 18px !important;
+    text-indent: 3em;
+}
+
+h5 {
+    font-size: 14px !important;
+    text-indent: 5em;
+}
+
+h6 {
+    font-size: 12px !important;
+    text-indent: 8em;
+}
 </style>
 
-<h4>标题1</h1>
-
-# Markdown一级标题
+# 一级标题
 ## 二级标题
-### 基本语法
+### 三级标题
+#### 四级标题
+##### 五级标题
+###### 六级标题
+
 1. **列表内容**
     - 修改邮箱尝试
     - 尝试修改标题颜色
