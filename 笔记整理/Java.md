@@ -414,3 +414,68 @@ public class NacosProviderApplication {
     }
 }
 ```
+## OpenFeign的使用方法
+1. 在pom.xml文件中添加OpenFeign和负载均衡依赖
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+</dependency>
+```
+2. 在配置文件中添加配置
+```yaml
+feign:
+  hystrix:
+    enabled: true #开启熔断机制
+  compression:
+    request:
+      enabled: true #开启请求压缩
+      mime-types: text/xml,application/xml,application/json #压缩的类型
+      min-request-size: 2048 #压缩的最小大小
+  client:
+    config:
+      default:
+        connectTimeout: 10000 #连接超时时间
+        readTimeout: 5000 #读取超时时间
+        loggerLevel: basic #日志级别
+```
+3. 在启动类上添加注解  @EnableFeignClients
+```java
+@EnableFeignClients
+@SpringBootApplication
+public class OpenFeignApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(OpenFeignApplication.class, args);
+    }
+}
+```
+4. 编写OpenFeign接口
+```java
+@FeignClient("item-service")
+public interface itemClient {
+    @GetMapping("/items")
+    List<ItemDto> queryItemsByIds(@RequestParam("ids") List<Long> ids)
+}
+```
+    
+5. 在调用接口的方法中注入ProviderService
+```java
+@RestController
+public class ConsumerController {
+    @Autowired
+    private final Itemclient itemclient;
+
+    @GetMapping("/consumer/hello")
+    public String hello() {
+        return itemClient.queryItemByIds(Arrays.asList(1L, 2L, 3L));
+    }
+} 
+```
+6. 当定义的Feign接口和调用的Feign接口不在同一个项目中时，需要在**启动类**上添加注解
+```java
+    @EnableFeignClients(basePackages = "com.hmall.api.clients")
+```
