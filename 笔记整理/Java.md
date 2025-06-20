@@ -368,5 +368,49 @@ System.out.println(person1.name);
 3. Map：映射，元素是键值对，键不可重复
 4. Queue：队列，元素有序、先进先出
 # 多线程
+# SpringCloud
+## Nacos
+<span class = "article-text"> Nacos使用方法
 
-
+1. 在Docker中下载运行Nacos的镜像文件
+2. 配置Nacos
+```Shell
+docker run -d \
+--name nacos \
+--env-file ./nacos/custom.env \
+-p 8848:8848 \
+-p 9848:9848 \
+-p 9849:9849 \
+--network my-net \
+nacos/nacos-server:v2.1.0-slim
+```
+3. 启动Nacos
+4. 在项目对应的pom.xml文件中添加依赖
+  
+```xml
+<dependency>  
+    <groupId>com.alibaba.cloud</groupId>  
+    <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>  
+    <version>2.2.6.RELEASE</version>  
+</dependency>
+```
+5. 在配置文件中添加配置
+```yaml
+spring:
+  application:
+    name: cart-service   #这里是微服务的具体名称
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 192.168.211.130:8848 #这里写Nacos运行的具体地址
+```
+6. 在启动类上添加注解  @EnableDiscoveryClient
+```java
+@EnableDiscoveryClient
+@SpringBootApplication
+public class NacosProviderApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(NacosProviderApplication.class, args);
+    }
+}
+```
