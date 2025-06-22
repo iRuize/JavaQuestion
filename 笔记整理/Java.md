@@ -370,7 +370,7 @@ System.out.println(person1.name);
 # 多线程
 # SpringCloud
 ## Nacos
-<span class = "article-text"> Nacos使用方法
+<span class = "article-text"> Nacos：配置中心+注册中心
 
 1. 在Docker中下载运行Nacos的镜像文件
 2. 配置Nacos
@@ -479,3 +479,103 @@ public class ConsumerController {
 ```java
     @EnableFeignClients(basePackages = "com.hmall.api.clients")
 ```
+## 网关
+1. 创建一个网关模块，
+2. 导入必要的依赖
+```xml
+<dependency>
+  <!--网关-->
+  <dependency>
+    <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-gateway</artifactId>
+  </dependency>
+  <!-- 注册中心Nacos -->
+  <dependency>
+    <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+  </dependency>
+  <!--负载均衡-->
+  <dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+  </dependency>
+</dependency>
+```
+3. 配置文件中添加配置
+```yaml
+server:
+  port: 8080
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      server-addr: 192.168.150.101:8848
+    gateway:
+      routes:
+        - id: item # 自定义名称，给人类看的
+          uri: lb://item-service # 路由的目标服务，需要和目标服务的application.name相同
+          predicates: # 路由断言，匹配规则
+            - Path=/items/**,/search/** 
+        - id: cart
+          uri: lb://cart-service
+          predicates:
+            - Path=/carts/**
+        - id: user
+          uri: lb://user-service
+          predicates:
+            - Path=/users/**,/addresses/**
+```
+## Nacos作为配置中心：配置共享
+<span class = "article-text">在Nacos上新建一个配置项，然后在各个微服务的配置文件中添加配置项的地址，这样就可以实现配置共享。
+<span class = "article-text">方案：这里出现的问题是yaml文件是SpringCloud上下文在初始化的时候读取的，如果yaml文件中不写入nacos的地址，那么启动会报错
+<span class = "article-text">解决：新建一个BootStrap文件，在里边写入基本的配置内容
+![配置读取顺序](../images/配置读取流程.png)
+<span class = "article-text">将nacos地址配置到bootstrap.yaml中，那么在项目引导阶段就可以读取nacos中的配置了。
+
+1. 在对应的微服务下添置配置依赖
+```xml
+<!--nacos配置管理-->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-config</artifactId>
+</dependency>
+```
+
+2.  在cart-service的Resource文件下添加bootstrap.yaml文件
+```yaml
+spring:
+  application:
+    name: cart-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 192.168.211.130:8848
+  profiles:
+    active: dev
+    config:
+        file-extension: yaml # 文件后缀名
+        shared-configs: # 共享配置
+          - dataId: shared-jdbc.yaml # 共享mybatis配置
+          - dataId: shared-log.yaml # 共享日志配置
+          - dataId: shared-swagger.yaml # 共享日志配置
+```
+3. 修改原本的yaml文件
+  
+##  Nacos作为配置中心：配置热更新
+1. 在Nacos中新建一个配置类，比如：cart-service.yaml
+```yaml
+hm:
+  cart:
+    maxAmount: 1 # 购物车商品数量上限
+```
+2. 在对应的微服务中新建一个属性读取类
+```java
+@Data
+@Component
+@ConfigurationProperties(prefix = "hm.cart")
+public class CartProperties {
+    private Integer maxAmount;  //这里的变量名要和yaml文件中的变量名一致
+}
+```
+3. 在业务代码中注入这个类并且在业务代码加上@RefreshScope注解即可使用  
