@@ -578,4 +578,117 @@ public class CartProperties {
     private Integer maxAmount;  //这里的变量名要和yaml文件中的变量名一致
 }
 ```
-3. 在业务代码中注入这个类并且在业务代码加上@RefreshScope注解即可使用  
+3. 在业务代码中注入这个类并且在业务代码加上@RefreshScope注解即可使用
+
+## Sentienl入门
+<span class = "article-text">Sentienl是一个开源的分布式微服务网关，它可以作为微服务架构中的网关层，为微服务架构提供统一的服务接入、安全、流量控制、熔断降级等功能。Sentienl以jar包的形式保存在了本地，运行的话只需要启动命令
+
+```Shell
+java -Dserver.port=8090 -Dcsp.sentinel.dashboard.server=localhost:8090 -Dproject.name=sentinel-dashboard -jar sentinel-dashboard.jar
+```
+<span class = "article-text">接下来在浏览器中输入8090端口即可进入到Sentienl的控制台。默认的账号密码都是Sentinel。
+
+1. 在对应的微服务组件中引入依赖
+```xml
+<dependency>
+    <groupId>com.alibaba.cloud</groupId>
+    <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+</dependency>
+```
+2. 在配置文件中添加Sentienl的配置
+```yaml
+spring:
+  sentinel:
+    transport:
+      dashboard: localhost:8090 #Sentienl控制台地址
+      port: 8090 #Sentienl的端口号
+    http-method-specify: true # 开启请求方式前缀
+```
+3.  | QPS | TPS |
+    | :--: | :--: |
+    | 每秒请求数 | 每秒事务数 |
+4. QPS：每秒请求数，即每秒钟系统能够处理的请求数量，QPS越高，系统的吞吐量越大。
+5. TPS：每秒事务数，即每秒钟系统能够处理的事务数量，TPS越高，系统的吞吐量越大。
+
+## 分布式事务：Seata
+<span class = "article-text">Seat在事务管理中扮演3个角色：
+-  TC (Transaction Coordinator) - 事务协调者：维护全局和分支事务的状态，协调全局事务提交或回滚。 
+-  TM (Transaction Manager) - 事务管理器：定义全局事务的范围、开始全局事务、提交或回滚全局事务。 
+-  RM (Resource Manager) - 资源管理器：管理分支事务，与TC交谈以注册分支事务和报告分支事务的状态，并驱动分支事务提交或回滚。
+  
+1. 导入资料文件中的seata-tc.sql文件到mysql数据库中，实现Seata的数据持久化
+2. 将资料文件中的seata文件夹导入到虚拟机的/root目录下
+3. docker部署seata-server
+4. 给参与分布式事务的每一个微服务引入Seata的依赖
+```xml
+<!--统一配置管理-->
+  <dependency>
+      <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+  </dependency>
+  <!--读取bootstrap文件(这个可以不写，具体要看版本)-->
+  <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-bootstrap</artifactId>
+  </dependency>
+  <!--seata-->
+  <dependency>
+      <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
+  </dependency>
+```
+5. 在Nacos配置中心中添加共享Seata的配置：shared-seata.yaml
+```yaml
+seata:
+  registry: # TC服务注册中心的配置，微服务根据这些信息去注册中心获取tc服务地址
+    type: nacos # 注册中心类型 nacos
+    nacos:
+      server-addr: 192.168.150.101:8848 # nacos地址
+      namespace: "" # namespace，默认为空
+      group: DEFAULT_GROUP # 分组，默认是DEFAULT_GROUP
+      application: seata-server # seata服务名称
+      username: nacos
+      password: nacos
+  tx-service-group: hmall # 事务组名称
+  service:
+    vgroup-mapping: # 事务组与tc集群的映射关系
+      hmall: "default"
+```
+6. 在微服务中添加bootstrap.yaml文件，并添加seata的配置
+```yaml
+spring:
+  application:
+    name: trade-service # 服务名称
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      server-addr: 192.168.211.139 # nacos地址
+      config:
+        file-extension: yaml # 文件后缀名
+        shared-configs: # 共享配置
+          - dataId: shared-jdbc.yaml # 共享mybatis配置
+          - dataId: shared-log.yaml # 共享日志配置
+          - dataId: shared-swagger.yaml # 共享日志配置
+          - dataId: shared-seata.yaml # 共享seata配置
+```
+7. 改造原本的yaml配置文件
+```yaml
+server:
+  port: 8085
+feign:
+  okhttp:
+    enabled: true # 开启OKHttp连接池支持
+  sentinel:
+    enabled: true # 开启Feign对Sentinel的整合
+hm:
+  swagger:
+    title: 交易服务接口文档
+    package: com.hmall.trade.controller
+  db:
+    database: hm-trade
+```
+8. 将Seata-at.sql文件导入到对应事务涉及到的mysql数据库中，实现Seata的AT模式的分布式事务
+9. 将原本事务处理的方法@Transactional注解改为@GlobalTransactional注解
+
+## 消息队列MQ：RaabitMQ
