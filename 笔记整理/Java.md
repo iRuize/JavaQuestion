@@ -71,7 +71,7 @@ span.article-text{
     text-indent: 2em;
 }
 </style>
-# Java学习笔记
+# 起言
 ## 目录划分
 
 <span>开始之前先梳理一下思路，目前学习过的东西已经很多了，把这些“八股文”简单的划分一下。</span>
@@ -878,3 +878,74 @@ public class TopicMessageProducer {
 }
 ```
 <span class = "article-text">在交换机设置中，如果routingKey设置为notice.*则表示可以匹配notice开头的内容，例如notice.email、notice.sms等，但是无法匹配notice.sms.info这种
+
+## MQ高级
+### 生产者重试机制
+<span class = "article-text">修改配置文件，添加以下配置
+
+```yaml
+spring:
+  rabbitmq: # RabbitMQ配置
+    host: 192.168.211.130
+    port: 5672
+    username: admin
+    password: 1234
+    virtual-host: /
+    retry:
+      enabled: true # 开启重试机制
+      max-attempts: 3 # 最大重试次数
+      initial-interval: 1000 # 第一次重试的间隔时间
+      multiplier: 1.5 # 间隔时间乘数
+      max-interval: 30000 # 最大重试间隔时间
+```
+### 生产者确认机制
+在publiser模块的yaml文件中添加配置
+```yaml
+spring:
+  rabbitmq: # RabbitMQ配置    
+    host: 192.168.211.130
+    port: 5672
+    username: admin
+    password: 1234
+    virtual-host: /
+    publisher-confirms-type: true # 开启生产者确认机制
+    publisher-returns: true # 开启发布返回
+```
+<span class = "article-text">这里publisher-confirms-type有三种模式可以选择：
+- none：不开启生产者确认机制，默认模式
+- simple：开启简单模式，只要消息被投递到队列，生产者会收到一个确认，如果消息没有被投递到队列，生产者会收到一个拒绝
+- correlated：启用 confirm 并支持 CorrelationData，可以让生产者在发送消息时附带一个 CorrelationData，当消费者接收到消息并处理完后，可以调用 confirm(CorrelationData) 来确认消息已经被消费。
+
+<span class = "article-text">新建一个配置包config，添加如下代码实现发送失败输出日志
+
+```java
+@Configuration
+public class RabbitConfig {
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(final ConnectionFactory connectionFactory) {
+        final RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+        rabbitTemplate.setConfirmCallback(new RabbitTemplate.ConfirmCallback() {
+            @Override    
+            public void confirm(CorrelationData correlationData, boolean ack, String cause) {
+                if (!ack) {
+                    log.error("消息发送失败，原因：{}", cause);
+                }
+            }
+        });
+        rabbitTemplate.setReturnCallback(new RabbitTemplate.ReturnCallback() {
+            @Override
+            public void returnedMessage(Message message, int replyCode, String replyText, String exchange, String routingKey) {
+                log.error("消息发送失败，交换机：{}, 路由键：{}, 回复码：{}, 回复信息：{}", exchange, routingKey, replyCode, replyText);
+            }
+        });
+        return rabbitTemplate;
+    }
+}
+```
+<span class = "article-text">在 RabbitMQ 的生产者确认机制中：
+
+1. ConfirmCallback（确认是否投递到 交换机）；如果交换机存在，那么就返回ack = true，否则返回false。
+2. ReturnCallback（确认是否从交换机成功 路由到队列）；如果交换机名称正确，routingKey错了，那么消息是可以正常达到交换机的，但是无法路由到队列，此时setReturnCallback会输出日志。
+
+### MQ的持久化
