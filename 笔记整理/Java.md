@@ -691,4 +691,190 @@ hm:
 8. 将Seata-at.sql文件导入到对应事务涉及到的mysql数据库中，实现Seata的AT模式的分布式事务
 9. 将原本事务处理的方法@Transactional注解改为@GlobalTransactional注解
 
-## 消息队列MQ：RaabitMQ
+## 消息队列MQ：RaabitMQ 
+<span class = "article-text">1.RabbitMQ是用来实现异步调用的消息队列。
+<span class = "article-text">2.比如原本的逻辑链条是A-B-C当我们请求发出之后，ABC被调用，全部是阻塞状态，这时候其他请求如果需要的微服务组件也是ABC的话就需要等待，但是如果引入MQ的话，我们请求只需要调用A即可，A会利用MQ通知BC，此时请求就可以结束，大大提高了工作效率。
+<span class = "article-text">3.RabbitMQ的适用场景：无需立刻给用户返回结果或者是不需要返回结果，比如用户点击购买，如果库存有价格合适直接返回成功，至于库存-1，这个就可以交给MQ来做，提高了效率。
+
+1. Docker中启动mq
+2. 打开后台地址：http://192.168.211.130:15672/#/
+3. 账号密码为：admin/1234
+4. 在项目中导入MQ依赖
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+5. 在配置文件中添加MQ的配置
+```yaml 
+spring:
+  rabbitmq:
+    host: 192.168.211.130
+    port: 5672
+    username: admin
+    password: 1234
+    virtual-host: /
+```
+6. 在需要调用的微服务中注入RabbitTemplate
+```java
+@Autowired
+private RabbitTemplate rabbitTemplate;
+```
+7. 简单调用MQ的方法
+```java
+public void testSimpleQueue() {
+        // 队列名称
+        String queueName = "simple.queue";
+        // 消息
+        String message = "hello, spring amqp!";
+        // 发送消息，语法
+        //rabbitTemplate.convertAndSend(".exchangename", "routing.key", "message");
+        //表示使用默认交换机,队列是simple.queue,消息是hello, spring amqp!
+        rabbitTemplate.convertAndSend(queueName," ", message);
+        
+    }
+
+```
+8. 启动消费者监听MQ
+```java
+@RabbitListener(queues = "queue.name")
+    public void listenSimpleQueueMessage(String msg) throws InterruptedException {
+        System.out.println("spring 消费者接收到消息：【" + msg + "】");
+    }
+```
+9. 交换机的引入
+交换机的类型有四种：
+- Fanout：广播，将消息交给所有绑定到交换机的队列。
+- Direct：订阅，基于RoutingKey（路由key）发送给订阅了消息的队列
+- Topic：通配符订阅，与Direct类似，只不过RoutingKey可以使用通配符
+- Headers：头匹配，基于MQ的消息头匹配，用的较少。
+10. 在Fanout的情况下，消息会被交换机绑定的所有的队列消费；routing.key 被忽略，所有绑定的队列都收到消息
+11. 在Direct的情况下，消息会被交换机绑定的队列消费，routing.key 必须与队列的binding key 一致才会被消费。模拟场景下两个队列emailQueue：接收 email 类型的消息，smsQueue：接收 sms 类型的消息交换机名称为：directExchange，使用 routingKey：email 和 sms
+```java
+//配置类
+@Configuration
+public class RabbitConfig {
+
+    // 定义 Direct 类型的交换机
+    @Bean
+    public DirectExchange directExchange() {
+        return new DirectExchange("directExchange");
+    }
+
+    // 定义 email 队列
+    @Bean
+    public Queue emailQueue() {
+        return new Queue("emailQueue");
+    }
+
+    // 定义 sms 队列
+    @Bean
+    public Queue smsQueue() {
+        return new Queue("smsQueue");
+    }
+
+    // 绑定 email 队列和交换机，routingKey 为 "email"
+    @Bean
+    public Binding bindingEmail(Queue emailQueue, DirectExchange directExchange) {
+        return BindingBuilder.bind(emailQueue).to(directExchange).with("email");
+    }
+
+    // 绑定 sms 队列和交换机，routingKey 为 "sms"
+    @Bean
+    public Binding bindingSms(Queue smsQueue, DirectExchange directExchange) {
+        return BindingBuilder.bind(smsQueue).to(directExchange).with("sms");
+    }
+}
+//生产者
+@Component
+public class MessageProducer {
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    public void sendEmailMessage(String message) {
+        rabbitTemplate.convertAndSend("directExchange", "email", message);
+    }
+
+    public void sendSmsMessage(String message) {
+        rabbitTemplate.convertAndSend("directExchange", "sms", message);
+    }
+}
+//消费者
+@Component
+public class MessageConsumer {
+
+    @RabbitListener(queues = "emailQueue")
+    public void receiveEmail(String message) {
+        System.out.println("收到邮件消息：" + message);
+    }
+
+    @RabbitListener(queues = "smsQueue")
+    public void receiveSms(String message) {
+        System.out.println("收到短信消息：" + message);
+    }
+}
+```
+
+12. 在Direct的情况下routing.key 支持 模糊匹配（使用 * 和 # 通配符）；order.* 可以匹配 order.create、order.update这里采用注解的形式来举例
+```java
+@Component
+public class TopicMessageConsumer {
+
+    // 监听队列 email.topic.queue，自动声明并绑定到 topicExchange，routingKey 为 "notice.email"
+    @RabbitListener(
+        bindings = @QueueBinding(
+            value = @Queue(value = "email.topic.queue", durable = "true"),
+            exchange = @Exchange(value = "topicExchange", type = ExchangeTypes.TOPIC),
+            key = "notice.email"
+        )
+    )
+    public void handleEmailMessage(String message) {
+        System.out.println("【邮件消费者】收到消息：" + message);
+    }
+
+    // 监听队列 sms.topic.queue，routingKey 为 notice.sms
+    @RabbitListener(
+        bindings = @QueueBinding(
+            value = @Queue(value = "sms.topic.queue", durable = "true"),
+            exchange = @Exchange(value = "topicExchange", type = ExchangeTypes.TOPIC),
+            key = "notice.sms"
+        )
+    )
+    public void handleSmsMessage(String message) {
+        System.out.println("【短信消费者】收到消息：" + message);
+    }
+}
+//生产者
+@RestController
+@RequestMapping("/send")
+public class TopicMessageProducer {
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    @GetMapping("/email")
+    public String sendEmailMsg() {
+        String message = "通知：您有一封新邮件，请查收。";
+        rabbitTemplate.convertAndSend("topicExchange", "notice.email", message);
+        return "邮件消息发送成功！";
+    }
+
+    @GetMapping("/sms")
+    public String sendSmsMsg() {
+        String message = "通知：您收到一条短信，请查收。";
+        rabbitTemplate.convertAndSend("topicExchange", "notice.sms", message);
+        return "短信消息发送成功！";
+    }
+
+    //这个接收不到
+    @GetMapping("/other")
+    public String sendOtherMsg() {
+        String message = "系统广播：所有人都能收到！";
+        rabbitTemplate.convertAndSend("topicExchange", "notice.all", message);
+        return "其他消息发送成功！";
+    }
+}
+```
+<span class = "article-text">在交换机设置中，如果routingKey设置为notice.*则表示可以匹配notice开头的内容，例如notice.email、notice.sms等，但是无法匹配notice.sms.info这种
