@@ -368,6 +368,94 @@ System.out.println(person1.name);
 3. Map：映射，元素是键值对，键不可重复
 4. Queue：队列，元素有序、先进先出
 # 多线程
+## 线程的创建方式
+1. 继承Thread类
+2. 实现Runnable接口
+3. 实现CallAble接口
+4. 通过线程池的方式创建线程
+   
+## volatile关键字
+<span class = "article-text">volatile关键字是Java提供的一种轻量级的同步机制，用来确保变量的可见性，当一个变量被volatile修饰时，它会强制所有线程都从主内存中读取变量的值，而不会从线程缓存或寄存器中读取，从而可以确保所有线程都能看到该变量的最新值。</span>
+
+## Synchronized关键字
+<span class = "article-text">synchronized 关键字包裹的代码块或方法，在同一时刻只能被一个线程执行，保证临界区代码的互斥访问，防止数据竞争。
+
+```java
+public class SafeCounter {
+    private int count = 0;
+
+    // 使用synchronized关键字修饰方法，保证同一时刻只有一个线程执行increment
+    public synchronized void increment() {
+        count++;
+    }
+
+    // 读取count时也加锁，确保读写一致性
+    public synchronized int getCount() {
+        return count;
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        SafeCounter counter = new SafeCounter();
+
+        // 创建多个线程同时调用increment
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 10000; i++) {
+                counter.increment();
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 10000; i++) {
+                counter.increment();
+            }
+        });
+
+        t1.start();
+        t2.start();
+//        主线程调用join挂起自己，直到t1和t2执行完毕
+        t1.join();
+        t2.join();
+
+        System.out.println("最终计数值：" + counter.getCount()); // 预期是20000
+    }
+}
+```
+## CAS 关键字
+<span class = "article-text">CAS（Compare And Swap）是一种无锁算法，是一种原子操作，是一种用于多线程编程的技术。CAS算法是通过硬件保证的，通过CAS指令，可以保证一个变量的原子性操作，即对一个变量进行读-修改-写操作，是一个原子操作。
+<span class = "article-text">如果当前的值等于旧值，那么就对当前值进行修改，否则什么都不做。这样就可以保障如果在变更值的过程中，其他线程修改了当前值，变更值操作就会失败</span>
+**示例**
+<span class = "article-text">银行转账余额有1000，想转出500，余下500，但是点击确定之前别的操作已经把余额该到了500，此时就会CAS失败，导致转账失败。
+
+## ConcurrentHashMap为什么是线程安全的
+<span class = "article-text">ConcurrentHashMap是线程安全的，原因是它内部使用了CAS和Synchronized锁机制来保证线程安全的。</span>
+
+1. 添加数据的时候如果桶为空，仅仅使用CAS就可以实现线程安全，不会出现竞争条件。
+   1. 可能出现两个线程同时往桶内写入数据，如果不使用CAS就会造成两个数据写入同一个位置，导致数据丢失。
+2. 添加数据时如果桶不为空，需要使用Synchronized锁机制，保证线程安全。
+   1. Synchornized锁会锁住对应的桶链表的第一个节点，保证线程安全。
+3. 读操作是无锁的
+   1. 节点数据是被Volatile关键字修饰的
+4. 删除数据时如果桶不为空，需要使用Synchronized锁机制，保证线程安全。
+   1. Synchornized锁会锁住对应的桶链表的第一个节点，保证线程安全。
+5. 删除数据时如果桶为空，不需要操作
+
+### ConcurrentHashMap的扩容机制
+1. sizeCtl = 0.75 * capacity; // 当前桶数组容量 * 负载因子，当实际存储的节点数 size >= sizeCtl 时，就会触发扩容；扩容时，将数组扩大为原来的 2 倍。
+2. 设置扩容状态sizeCtl = -1; // 负值表示正在扩容
+3. 多个线程一起迁移数据
+4. 将已经迁移完成的桶设置标记ForwardingNode，并将ForwardingNode的next指针指向新的数组，然后将ForwardingNode置为null，表示迁移完成。
+5. 所有桶迁移完成之后table指向新的数组，sizeCtl = 0，表示扩容完成。
+
+<span class = "article-text">ConcurrentHashMap内部是数组+链表/红黑树的结构（类似于HashMap），每次只对对应的桶加锁。</span>
+
+## 线程的生命周期
+1. 新建状态：线程刚被创建，但还没有开始运行。
+2. 就绪状态：线程已经准备好运行，等待CPU分配时间片。
+3. 运行状态：线程正在运行，占用CPU资源。
+4. 阻塞状态：线程因为某种原因放弃CPU资源，暂时停止运行。
+5. 死亡状态：线程已经执行完毕，或者被其他线程终止。
+
+
 # SpringCloud
 ## Nacos
 <span class = "article-text"> Nacos：配置中心+注册中心
@@ -384,8 +472,8 @@ docker run -d \
 --network my-net \
 nacos/nacos-server:v2.1.0-slim
 ```
-3. 启动Nacos
-4. 在项目对应的pom.xml文件中添加依赖
+1. 启动Nacos
+2. 在项目对应的pom.xml文件中添加依赖
   
 ```xml
 <dependency>  
