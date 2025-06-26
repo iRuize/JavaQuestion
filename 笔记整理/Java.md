@@ -377,7 +377,7 @@ System.out.println(person1.name);
 ## volatile关键字
 <span class = "article-text">volatile关键字是Java提供的一种轻量级的同步机制，用来确保变量的可见性，当一个变量被volatile修饰时，它会强制所有线程都从主内存中读取变量的值，而不会从线程缓存或寄存器中读取，从而可以确保所有线程都能看到该变量的最新值。</span>
 
-## Synchronized关键字
+## Synchronized关键字s
 <span class = "article-text">synchronized 关键字包裹的代码块或方法，在同一时刻只能被一个线程执行，保证临界区代码的互斥访问，防止数据竞争。
 
 ```java
