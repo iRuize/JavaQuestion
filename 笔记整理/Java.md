@@ -969,7 +969,7 @@ public class TopicMessageProducer {
 
 ## MQ高级
 ### 生产者重试机制
-<span class = "article-text">修改配置文件，添加以下配置
+<span class = "article-text">目的：确保消息可以发送到消息中间件，配置方法：修改配置文件，添加以下配置
 
 ```yaml
 spring:
@@ -1000,6 +1000,7 @@ spring:
     publisher-returns: true # 开启发布返回
 ```
 <span class = "article-text">这里publisher-confirms-type有三种模式可以选择：
+
 - none：不开启生产者确认机制，默认模式
 - simple：开启简单模式，只要消息被投递到队列，生产者会收到一个确认，如果消息没有被投递到队列，生产者会收到一个拒绝
 - correlated：启用 confirm 并支持 CorrelationData，可以让生产者在发送消息时附带一个 CorrelationData，当消费者接收到消息并处理完后，可以调用 confirm(CorrelationData) 来确认消息已经被消费。
@@ -1037,3 +1038,165 @@ public class RabbitConfig {
 2. ReturnCallback（确认是否从交换机成功 路由到队列）；如果交换机名称正确，routingKey错了，那么消息是可以正常达到交换机的，但是无法路由到队列，此时setReturnCallback会输出日志。
 
 ### MQ的持久化
+#### 什么时候需要消息持久化？
+<span class = "article-text">首先要了解的一点是：在初始状态下，为了提高性能，MQ都是在内存中存储的数据，和Redis一样的。对于强一致性的业务，比如订单系统、支付系统、库存扣减、异步型事务等等，消息持久化是必须的。
+<span class = "article-text">消息持久化并不能保证消息100%不丢失，消息仍有可能在写入磁盘的过程中因为RabbitMq挂掉而导致消息丢失，要做到真正的消息持久化需要添加生产者确认机制+消息持久化（磁盘存储）。
+
+1. 添加AMQP的依赖
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+1. 持久化配置在代码中写死或者是通过配置文件配置
+```java
+@Configuration
+public class RabbitConfig {
+
+    public static final String EXCHANGE_NAME = "my-exchange";
+    public static final String QUEUE_NAME = "my-queue";
+    public static final String ROUTING_KEY = "my-routing-key";
+
+    // 持久化 Direct 交换机
+    @Bean
+    public Exchange exchange() {
+        return ExchangeBuilder.directExchange(EXCHANGE_NAME)
+                .durable(true) // 持久化
+                .build();
+    }
+
+    // 持久化队列
+    @Bean
+    public Queue queue() {
+        return QueueBuilder.durable(QUEUE_NAME) // durable = true
+                .build();
+    }
+
+    // 绑定
+    @Bean
+    public Binding binding(Queue queue, Exchange exchange) {
+        return BindingBuilder
+                .bind(queue)
+                .to((DirectExchange) exchange)
+                .with(ROUTING_KEY);
+    }
+}
+```
+1. 发送持久化消息
+
+```java
+MessageProperties props = new MessageProperties();
+props.setDeliveryMode(MessageDeliveryMode.PERSISTENT); // 消息持久化
+Message message = new Message("hello".getBytes(), props);
+rabbitTemplate.send("my-exchange", "my-routing-key", message);
+```
+### 惰性队列
+<span class = "article-text">在默认情况下，为了速度，消息是保留在内存当中，但是在某些情况下仍然会导致消息积压，比如消费者宕机或者是出现网络状况、消息发送太快，消费者跟不上，消费者处理业务发生阻塞。一旦出现消费堆积，内存占用会越来越高，直到触发预警上限之后，会将消息存储到磁盘当中，此过程会阻塞生产者，生产者所有请求都会被阻塞。
+<span class = "article-text">为了解决这个问题，RabbitMQ提供了一种消息队列的实现方式：惰性队列。
+
+1. 交换机转发给消息队列之后，懒惰队列收到消息之后直接将消息存储到本地
+2. 消费者要消费消息的时候才会从磁盘读取到内存
+
+- 设置懒惰队列
+```java
+    // 2. 声明懒惰队列（关键参数 x-queue-mode = lazy）
+    @Bean
+    public Queue lazyQueue() {
+        Map<String, Object> args = new HashMap<>();
+        args.put("x-queue-mode", "lazy"); // 懒惰模式
+
+        return QueueBuilder.durable(LAZY_QUEUE)
+                .withArguments(args)
+                .build();
+    }
+```
+### 消费者的确认机制
+<span class = "article-text">消费者确认机制是指消费者在消费完消息之后，向RabbitMQ发送确认消息，RabbitMQ收到确认消息之后才会将消息从队列中移除。
+
+- ack：成功处理消息，RabbitMQ从队列中删除该消息
+- nack：消息处理失败，RabbitMQ需要再次投递消息
+- reject：消息处理失败并拒绝该消息，RabbitMQ从队列中删除该消息
+
+<span class = "article-text">由于消息回执的处理代码比较统一，因此SpringAMQP帮我们实现了消息确认。并允许我们通过配置文件设置ACK处理方式，有三种模式：
+
+- none：不处理。即消息投递给消费者后立刻ack，消息会立刻从MQ删除。非常不安全，不建议使用
+- manual：手动模式。需要自己在业务代码中调用api，发送ack或reject，存在业务入侵，但更灵活
+- auto：自动模式。SpringAMQP利用AOP对我们的消息处理逻辑做了环绕增强，当业务正常执行时则自动返回ack.  当业务出现异常时，根据异常判断返回不同结果：
+
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: none # 不做处理
+```
+### 消费者确认机制
+<span class = "article-text">消费者确认机制是指消费者在消费消息失败的时候，可以自动重试，直到（这里有问题）消费成功。
+
+- 开启消费者重试机制
+- none：不处理。即消息投递给消费者后立刻ack，消息会立刻从MQ删除。非常不安全，不建议使用
+- manual：手动模式。需要自己在业务代码中调用api，发送ack或reject，存在业务入侵，但更灵活
+- auto：自动模式。SpringAMQP利用AOP对我们的消息处理逻辑做了环绕增强，当业务正常执行时则自动返回ack.  当业务出现异常时，根据异常判断返回不同结果：
+  - 如果是业务异常，会自动返回nack；
+  - 如果是消息处理或校验异常，自动返回reject;
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: none # 不做处理
+```
+### 消费失败重试机制
+<span class = "article-text">消费失败确认机制是指消费者在消费消息失败的时候，可以自动重试，直到消费成功。这里出现一个问题就是消息会一直重复进入消息队列，消费失败，进入消息队列，消费失败......如此反复。更改yaml配置文件：
+
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        retry:
+          enabled: true # 开启消费者失败重试
+          initial-interval: 1000ms # 初识的失败等待时长为1秒
+          multiplier: 1 # 失败的等待时长倍数，下次等待时长 = multiplier * last-interval
+          max-attempts: 3 # 最大重试次数
+          stateless: true # true无状态；false有状态。如果业务中包含事务，这里改为false
+```
+
+### 失败处理策略
+<span class = "article-text">在之前的测试中，本地测试达到最大重试次数后，消息会被丢弃。这在某些对于消息可靠性要求较高的业务场景下，显然不太合适了。因此Spring允许我们自定义重试次数耗尽后的消息处理策略，这个策略是由MessageRecovery接口来定义的，它有3个不同实现：
+
+-  RejectAndDontRequeueRecoverer：重试耗尽后，直接reject，丢弃消息。默认就是这种方式 
+-  ImmediateRequeueMessageRecoverer：重试耗尽后，返回nack，消息重新入队 
+-  RepublishMessageRecoverer：重试耗尽后，将失败消息投递到指定的交换机 
+
+<span class = "article-text">比较优雅的一种处理方案是RepublishMessageRecoverer，失败后将消息投递到一个指定的，专门存放异常消息的队列，后续由人工集中处理。
+
+1. 在服务中定义处理失败消息的交换机和队列
+```java
+@Configuration
+@ConditionalOnProperty(name = "spring.rabbitmq.listener.simple.retry.enabled", havingValue = "true")
+public class ErrorMessageConfig {
+    @Bean
+    public DirectExchange errorMessageExchange(){
+        return new DirectExchange("error.direct");
+    }
+    @Bean
+    public Queue errorQueue(){
+        return new Queue("error.queue", true);
+    }
+    @Bean
+    public Binding errorBinding(Queue errorQueue, DirectExchange errorMessageExchange){
+        return BindingBuilder.bind(errorQueue).to(errorMessageExchange).with("error");
+    }
+
+    //RepublishMessageRecoverer 是 Spring AMQP 提供的一个消息恢复器，用于 消费失败时重新发布消息。
+    //它会把消费失败的消息重新发布（republish）到指定的交换机 error.direct，并使用路由键 "error"。
+    //这样失败消息就不会丢失，而是进入错误队列，方便后续处理和排查。
+    @Bean
+    public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
+        return new RepublishMessageRecoverer(rabbitTemplate, "error.direct", "error");
+    }
+}
+```
+### 业务的幂等性
