@@ -170,6 +170,48 @@ class Main{
 <span class = "article-text">在上面的代码中，Animal dog1 = new Dog(); dog1的静态类型是（编译时类型）Animal，在编译的时候编译器会检查Animal中是否有sound方法，如果有则选择该方法，如果没有则报错。在运行的时候，JVM根据变量引用的动态类型（运行时类型）也就是实际类型来决定调用哪个方法，dog1的实际类型是Dog，所以调用的实际方法是Dog的sound方法。这个就是运行时多态，在运行的时候才确定方法的调用对象。</span>
 <span class="article-text">在上述代码中的两个dog对象是不一样的，对于dog1来说，他可以访问的方法是Animal中的非私有方法或者是Dog中已经**重写**的方法，而对于dog2来说，他可以访问的方法是Animal中非私有可以继承过来的方法以及Dog中独有的方法。</span>
 
+## Java反射机制
+<span class = "article-text">允许在运行时动态的获取类的内容，举例类似于的操作 BeanUtils.copyProperties</span>
+
+```java
+      // 源对象
+      public class UserDTO {
+         private String name;
+         private int age;
+         // Getter & Setter
+      }
+      // 目标对象
+      public class UserEntity {
+         private String name;
+         private int age;
+         // Getter & Setter
+      }
+      import java.lang.reflect.Field;
+
+      public class ReflectUtil {
+         public static void copyFields(Object source, Object target) {
+
+            Class<?> srcClass = source.getClass();
+            Class<?> tgtClass = target.getClass();
+            Field[] srcFields = srcClass.getDeclaredFields();
+            for (Field srcField : srcFields) {
+               try {
+                  String fieldName = srcField.getName();
+                  Field tgtField = tgtClass.getDeclaredField(fieldName);
+                  if (tgtField.getType().equals(srcField.getType())) {
+                     srcField.setAccessible(true);
+                     tgtField.setAccessible(true);
+                     Object value = srcField.get(source);
+                     tgtField.set(target, value);
+                  }
+               } catch (NoSuchFieldException | IllegalAccessException e) {
+                  // 如果字段不存在或不可访问，跳过
+                  continue;
+               }
+           }
+       }
+      }
+```
 
 ## Java的优势是什么？
 1. 跨平台：由于JVM java 虚拟机的存在，可以实现一次编写多次运行。
@@ -193,8 +235,16 @@ class Main{
 <span class = "article-text">在基本数据类型中只能使用 == 来比较两个对象的内存地址是否一致，不能使用 equals 方法，会直接报错。</span>
 <span class = "article-text">equals 在没有重写之前和 == 是相同的，在方法重写之后需要根据equals的具体方法来考虑，对于 == 而言的话，如果是基本数据类型，则比较的是值，如果是引用类型，则比较的是引用地址。</span>
 
+## String、StringBuilder、StringBuffer的区别
+
+1. String：不可变的字符序列，线程安全，效率高，适用于少量字符串的场景。
+2. StringBuilder：可变的字符序列，线程不安全，效率高，适用于单线程场景。
+3. StringBuffer：可变的字符序列，线程安全，效率低，适用于多线程场景。
+         1. 内部使用了 synchronized 关键字，效率低。
+
 ## 序列化和反序列化
 <span class = "article-text">序列化：将一个对象转换为字节流，字节流可以保存到文件，数据库缓存中，便于传递。</span>
+
 1. 存储用户的设置
 2. 存储未付款的订单
 
@@ -204,6 +254,38 @@ class Main{
 
 <span class = "article-text">使用场景：用户将本地设置上传到云端，可以分享给其他用户或者是等待以后再用当前app时可以快捷更改设置。将用户当前的设置存储为文件，然后数据库中保存这个文件
 
+**使用方法**
+  1. 要序列化的类必须要实现Serializable接口，该接口是一个标记接口，没有任何方法，但是它是一个标记接口，表示该类可以被序列化。
+  2. 默认是序列化成字节序列然后输出成一个文件
+  3. 也可以使用JackSon库进行序列化，可以将对象转换成JSON字符串，或者将JSON字符串转换成对象。
+    1. 引入依赖：
+      ```xml
+      <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+          <version>2.13.2</version>
+      </dependency>
+      ```
+   2. 定义一个java类，必须有无参构造函数，不需要实现Serializable接口。
+   3. 使用ObjectMapper进行序列化，或者使用writeValueAsString方法将对象转换成JS符串。
+   ```java
+      Person person = new Person("邸睿泽", 25);
+      ObjectMapper mapper = new ObjectMapper();
+      // 1. 序列化为 JSON 字符串
+      String jsonString = mapper.writeValueAsString(person);
+      System.out.println("JSON字符串: " + jsonString);
+   ```
+
+   6. 反序列化使用readValue方法将JSON字符串转换成对象。
+   ```java
+      String jsonString = "{\"name\":\"邸睿泽\",\"age\":25}";
+      ObjectMapper mapper = new ObjectMapper();
+      // 2. 将 JSON 字符串转换成对象
+      Person person = mapper.readValue(jsonString, Person.class);
+      System.out.println("Person对象: " + person);
+   ```
+  这里需要注意的是使用JackSon库进行序列化的结果和tostring输出是不一样的
+   
 ## 接口和抽象类有什么区别
 ### 接口
 <span class = "article-text">接口中只是保存具体的方法名称以及方法参数，没有方法体，接口可以多继承比如接口A实现了方法A，B接口实现了方法B，C接口继承A和B，C接口中定了方法C，这个时候一个类如果要实现接口C的话需要实现A,B,C三个方法，代码如下：</span>
@@ -360,24 +442,157 @@ System.out.println(person1.name);
 ```
 <span class = "article-text">这里传递过去之后，直接把person1内存地址下的name更改了，所以在下方输出的时候才会输出新的值Tom</span>
 
+# JVM
+## JVM的内存结构
+1. 堆内存：存放对象实例，包括新创建的对象、对象的成员变量，字符串等。
+2. 栈内存：存放的是方法的局部变量
+3. 方法区（元空间）：类名，静态方法，静态变量
+4. 程序计数器：存放当前线程执行的字节码的地址。
+5. 本地方法栈：java可以调用非java语言的接口，方法，比如C、C++等，这存放这些接口的栈信息。
+## JVM的垃圾回收机制
+1. 判断那些对象可以回收
+   1. 引用计数法
+   2. 根可达性分析 
+2. 垃圾回收算法
+   1. 标记清除：标记存活对象，清除未标记对象：会产生大量内存碎片，影分配。
+   2. 标记整理：标记所有需要回收的对象，然后让所有存活的对象向一端移后直接清理掉端边界以外的内存，主要应用在老年代。
+   3. 复制算法：将内存分为两块，每次只使用其中一块，当这一块内存用完将还存活的对象复制到另一块内存上，然后清理掉第一块内存。
+   4. 分代收集：根据对象存活周期将内存划分为不同的区域，不同区域采用收集算法。
+3. 垃圾回收作用区域：堆内存
+   1. 新生代
+      1. Eden区
+      2. Survivor区
+         1. Survivor To区
+         2. Survivor From区
+   2. 老年代
+   3. 元空间
+4. 垃圾回收器
+   1. Serial垃圾回收器：单线程执行垃圾回收，适用于小数据量的场景。
+   2. Parallel Scavenge垃圾回收器：多线程执行垃圾回收，适用于中等数据量的场景。
+   3. CMS垃圾回收器：并发标记清除，适用于大数据量的场景。
+   4. G1垃圾回收器：基于标记整理算法，适用于大数据量的场景。
+   5. ZGC垃圾回收器：基于复制算法，适用于高性能场景。
+5. MinorGC
+    1. 作用在新生代，可能导致新生代对象晋升老年代   
+    2. 触发时机：Eden区满
+    3. 标记可以清除的对象，采用根可达性分析法
+    4. 复制存存活对象：将伊甸园和Survivor From中存活的对象Survivor To区或者是老年代，如果一个对象在Survivor活了那么也会进入老年代，如果Survivor满了，也是直接进入老年代。
+    5. 清空伊甸园和Survivor From区，将Survivor FroSurvivor To区交换
+## JVM的类加载机制
+1. 类加载过程
+  1. 加载
+     1. 类加载器通过类的全限定类名找到.class 文件，读入后在方法区中创建 Class 对象
+ 2. 链接
+     1. 验证：确保 class 文件没有安全问题
+     2. 准备：给静态变量分配内存，并设置对应的初始值，比如 设置 0，Integer 对应的是 null
+    3. 解析：将类方法字段的符号引用转换为直接引用，即内存地址 
+ 3. 初始化
+    1. 赋予静态变量最终值，并执行 static 代码块
+## 双亲委派
+1. 类加载器：应用类加载器、启动类加载器、扩展类加载器。
+2. 双亲委派模型：先让父类加载器加载，父类加载失败再让子类加载。
+- 举例：假如需要加载 String 类
+- 自定义 ClassLoader 收到请求
+               ↓
+  先委托给 AppClassLoader（应用类加载器）
+               ↓
+  再委托给 ExtClassLoader（扩展类加载器）
+                ↓
+  再委托给 BootstrapClassLoader（启动类加载器）
+               ↓
+  Bootstrap 找到 rt.jar 中的 String.class → 加载成功，果
+  ✅ 自定义 ClassLoader 什么都没做，只有在父类都加载失败时，自定义的类加载器才会起作用。 
+- 作用
+  - 防止用户自定义的类覆盖核心类
+  - 同一个类只会被类加载器加载一次，减少内存的浪费
+## JVM调优
+1. 堆内存大小：-Xms -Xmx
+2. 新生代大小：-XX:NewRatio
+3. 老年代大小：-XX:SurvivorRatio
+4. 垃圾回收算法：-XX:+UseSerialGC -XX:+UseParallelGC -+UseConcMarkSweepGC
+5. 垃圾回收器：-XX:+PrintCommandLineFlags -+PrintGCDetails -XX:+PrintGCTimeStamps -+PrintGCDateStamps -XX:+PrintHeapAtGC -+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=dump.hprof
+6. 优化GC日志：-Xloggc:gc.log -XX:+PrintGCDetails -+PrintGCTimeStamps -XX:+PrintGCDateStamps -+PrintHeapAtGC -XX:+HeapDumpOnOutOfMemoryErr-XX:HeapDumpPath=dump.hprof
 # 集合
 ## Java中集合的种类：
 
 1. List：列表，元素有序、可重复
 2. Set：集合，元素无序、不可重复
 3. Map：映射，元素是键值对，键不可重复
-4. Queue：队列，元素有序、先进先出
+## ArrayList的扩容机制
+<span class = "article-text">如果是初始大小为空，设定初始大小为0，在第一次写入数据的时候会进行扩容到10；如果设定初始为0，那么就执行正常的扩容；当数组没有容量的时候才会扩容，新数组的长度是旧数组1.5倍，（底层代码是new_length = length + length >> 1）先创建新的数组，然后执行复制操作，最后销毁旧的数组，整个扩容完成
+
+## HashMap相关
+### HashMap的底层数据结构是什么？
+数组+链表+红黑树的结构
+### HashMap的扩容机制以及树化机制？
+1.  扩容机制：HashMap的默认容量是16，扩容因子是0.75，当实际存储的节点数大于等于0.75 * 16时，就会触发扩容，桶的数量会变成两倍。
+2.  树化机制：当一个桶内的键值对达到 8 条之后并且当前桶的数量已经到了 64（历经两次扩容），此时桶内的数据才会由链表的形式转变为红黑树的形式。如果桶内的键值对小于 6，则会重新变成链表结构。
+### 重写equals方法要不要重写hashcode方法？
+<span class = "article-text">必须要重写hashcode方法。在默认情况下equals方法返回的内容是内存地址的文本，hashCode方法返回的是基于内存地址计算出的整数。如果不重写hashcode方法，就会出现两个对象相同，但是hashCode却不同，导致HashMap的put方法无法将两个对象存入同一个桶内。比如新建两个人对象，一个是23岁的John，另一个是25岁的John，重写equals方法，仅仅比较名称，此时两个人是一样的，但是hashcode是不一样的，与期望相悖。
+
+### HashMap的线程安全问题？
+<span class = "article-text">HashMap是线程不安全的，数据的更改过程均没有采用CAS+Synchorinzed机制，导致数据不一致。
+
+### 如何决定数据存入哪一个桶？
+<span class = "article-text">最终计算出的哈希值对当前桶的数量取余，余数是几就放在哪一个桶内，桶的编号从0开始。
+
+### 哈希运算是什么样子的？
+<span class = "article-text">不同的类哈希运算不同，以String为例，首先将初始哈希值右移16位，然后与默认的哈希值进行异或(相同为0，不同为1)运算，得到新的哈希值。int hash = h ^ (h >>> 16);  
+
+## ConcurrentHashMap相关
+### 线程安全的原因：
+1. 扩容机制：ConcurrentHashMap使用了CAS和Synchronized锁机程安全的。
+2. 读操作是无锁的：节点数据是被Volatile关键字修饰的。
+3. 写操作：添加数据的时候如果桶为空，仅仅使用CAS就可以实现线会出现竞争条件。添加数据时如果桶不为空，需要使用Synchronized证线程安全。Synchornized锁会锁住对应的桶链表的第一个节点，全。
+4. 删除操作：删除数据时如果桶不为空，需要使用Synchronized锁线程安全。Synchornized锁会锁住对应的桶链表的第一个节点，保证线程安全。
+### ConcurrentHashMap的扩容机制：
+1. sizeCtl = 0.75 * capacity; // 当前桶数组容量 * 负载因存储的节点数 size >= sizeCtl 时，就会触发扩容；扩容时，将数来的 2 倍。
+2. 设置扩容状态sizeCtl = -1; // 负值表示正在扩容
+3. 多个线程一起迁移数据
+4. 将已经迁移完成的桶设置标记ForwardingNode，并将Forwardingnext指针指向新的数组，然后将ForwardingNode置为null，表示迁移完成。
+5. 所有桶迁移完成之后table指向新的数组，sizeCtl = 0，表示扩容完成。
 # 多线程
 ## 线程的创建方式
 1. 继承Thread类
 2. 实现Runnable接口
 3. 实现CallAble接口
 4. 通过线程池的方式创建线程
-   
+## 自定义线程池
+<span class = "article-text">自定义线程需要手动指定对应7个参数
+
+  1. 核心线程数
+  2. 最大线程数
+  3. 空闲线程存活时间 
+  4. 时间单位
+  5. 任务队列
+  6. 线程工厂
+  7. 拒绝策略
+     1. 默认：AbortPolicy，直接抛出 RejectedExecutionException 异常止系统正常运行。
+     2. CallerRunsPolicy，只用调用者所在线程来运行任务，不会抛出异常。
+     3. DiscardOldestPolicy，丢弃队列中等待最久的任务，并执行当前任务。
+     4. DiscardPolicy，直接丢弃任务，不做任何处理。
+```java
+ThreadPoolExecutor executor = new ThreadPoolExecutor(
+  5,                       // 核心线程数
+  10,                      // 最大线程数
+  60L,                     // 空闲线程存活时间
+  TimeUnit.SECONDS,        // 时间单位
+  new ArrayBlockingQueue<>(200),  // 任务队列
+  new ThreadFactory() {    // 线程工厂
+     @Override
+     public Thread newThread(Runnable r) {
+     Thread t = new Thread(r);
+     t.setName("custom-thread-" + t.getId());
+     return t;
+    }
+  },
+  new ThreadPoolExecutor.CallerRunsPolicy()  // 拒绝策略
+ );
+ ```
 ## volatile关键字
 <span class = "article-text">volatile关键字是Java提供的一种轻量级的同步机制，用来确保变量的可见性，当一个变量被volatile修饰时，它会强制所有线程都从主内存中读取变量的值，而不会从线程缓存或寄存器中读取，从而可以确保所有线程都能看到该变量的最新值。</span>
 
-## Synchronized关键字s
+## Synchronized关键字
 <span class = "article-text">synchronized 关键字包裹的代码块或方法，在同一时刻只能被一个线程执行，保证临界区代码的互斥访问，防止数据竞争。
 
 ```java
@@ -1612,3 +1827,23 @@ public class ErrorMessageConfig {
 }
 ```
 ### 业务的幂等性
+# 数据结构
+## 红黑树
+1. 红黑树结构保证查找性能是O(logn)，插入删除性能是O(logn)，是一种平树。
+2. 结构满足5条性质：
+    1. 根节点是黑色。
+    2. 每个节点是红色或者黑色。
+    3. 每个叶子节点（NIL）是黑色。
+    4. 如果一个节点是红色，则它的子节点必须是黑色。
+    5. 从任一节点到其每个叶子的所有路径上包含相同数目的黑色节点。
+## B+树
+1. 所有的数据存储在叶子结点
+2. 非叶子节点只做索引，不存储数据
+3. 叶子结点通过链表相连接
+# 其它
+## 进程和线程的区别
+1. 进程可以包含多个线程
+2. 进程是操作系统分配资源的最小单位，线程是 CPU 调度的基本单位
+3. 进程有独立的数据，堆，栈；线程共享进程的数据，堆，栈
+4. 调度方面，进程切换耗费大，线程很小
+5. 一个进程崩溃不会影响其他进程，但是某个线程崩溃会影响其他线程，可能导致进程失败
