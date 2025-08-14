@@ -1083,6 +1083,62 @@ SET lock_key "value" NX EX 10
 4. 客户端请求可以访问任意节点，最终都会别转发到正确的节点
 5. Redis 分片集群引入了哈希槽的概念，有 16384 个哈希槽，分配到不同的实例，根据 key 的有效部分计算哈希值，对 16384 取余
 
+# Mybatis
+## Param注解和foreach的使用方式
+<span class = "article-text">今天在开发过程中接触到了若干纯粹Mybatis直接数据的情况，核心思想还是多条SQL转化为一条一起插入。需要用到Mybatis的“foreach”标签。
+
+1. 在Mapper中的
+
+```java
+int deleteTreesByIds(@Param("ids") Long[] ids);
+```
+2. 在对应的XML中
+
+```xml
+    <delete id="deleteTreesByIds" parameterType="long[]">
+        DELETE from hyper_tree_single
+        where hyper_tree_single.line_id in
+        <foreach collection="ids" item="id" index="index" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+```
+<span class = "article-text">@Param 注解的值会映射为 <foreach> 中 collection 属性的名称。例如，若 @Param("abc")，则 <foreach> 的 collection 必须写 "abc"，与方法参数名无关。
+<span class = "article-text">item 表示当前循环元素，类似 Java 增强 for 循环中的临时变量，不受 @Param 影响，可自定义；index 表示循环索引（下标）；open 与 close 分别表示循环结果的前后缀，separator 表示元素之间的分隔符。这三个属性常用于生成合法的 SQL 结构（如 IN 子句的括号和逗号分隔）。
+
+3. SQL实例化实例
+
+```SQL
+DELETE
+FROM hyper_tree_single
+WHERE hyper_tree_single.line_id IN (1001, 1002, 1003);
+```
+
+4. 其中open和close不应是必须要写的，比如在insert的过程中，SQL是自带左右括号的，因此只需要添加separate是逗号即可。
+
+```XML
+    <insert id="insertBatchSingleTrees" parameterType="java.util.List">
+        insert into hyper_tree_single
+        (line_id,line_segment_id,center_x,center_y,center_z,height,vertical_distance)
+        VALUES
+        <foreach collection="hyperTreeSingles" item="item" separator=",">
+            (#{item.lineId}, #{item.lineSegmentId}, #{item.centerX}, #{item.centerY}, #{item.centerZ}, #{item.height},
+            #{item.verticalDistance})
+        </foreach>
+    </insert>
+```
+SQl实例化
+```SQL
+INSERT INTO hyper_tree_single
+    (line_id, line_segment_id, center_x, center_y, center_z, height, vertical_distance)
+VALUES
+    (1, 101, 12.34, 56.78, 90.12, 15.5, 2.3),
+    (2, 102, 23.45, 67.89, 12.34, 16.8, 3.1),
+    (3, 103, 34.56, 78.90, 23.45, 14.2, 4.7);
+```
+## #{}和${}的区别
+<span class = "article-text">老生常谈的问题，#{}可以预防SQL注入。
+
 # SpringCloud
 ## Nacos
 <span class = "article-text"> Nacos：配置中心+注册中心
