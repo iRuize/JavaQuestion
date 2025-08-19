@@ -460,7 +460,7 @@ change(p1);
 System.out.println(p1.getName());  // 仍然是 "Jerry"
 ```
 
-<span class = "article-text">在代码运行的过程中首先是新建了一个p1，其中保存的内容是Jerry，在运行到Change方法的时候，系统会新建一个新的变量：p，p的内容和p1是一样的，都是Jerry，再具体的方法体中，修改的内容是p的内容，也就是把p的内容又Jerry改成了Tom，但是p1的内容并没有改变，所以最后输出的结果仍然是Jerry。</span>
+<span class = "article-text">在代码运行的过程中首先是新建了一个p1，其中保存的内容是Jerry，在运行到Change方法的时候，系统会新建一个新的变量：p，p的内容和p1是一样的，都是Jerry，但是在具体的方法体中，修改的内容是把p更换成了Tom，也就是把p的内容从Jerry改成了Tom，但是p1的内容并没有改变，所以最后输出的结果仍然是Jerry。</span>
 第二种情况：
 
 ```java
@@ -474,7 +474,7 @@ changeName(person1);
 System.out.println(person1.name);
 ```
 
-<span class = "article-text">这里传递过去之后，直接把 person1 内存地址下的 name 更改了，所以在下方输出的时候才会输出新的值 Tom</span>
+<span class = "article-text">这种情况是直接改变了当前内存地址所指向的内容，所以最后输出的结果是Tom。</span>
 
 # JVM
 
