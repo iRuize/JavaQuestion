@@ -460,8 +460,8 @@ change(p1);
 System.out.println(p1.getName());  // 仍然是 "Jerry"
 ```
 
-<span class = "article-text">这里在调用 change(p1)的时候会向函数内传递 p1 所代表的内存地址，这个地址会赋值给 p，但是 p = new Person("Tom", 20);这句话只是创建一个新的 Person 对象，更改 p 的指向，并不会改变 p1 的指向，所以在函数执行完毕后，p1 的 name 仍然是"Jerry"。</span>
-第二种情况
+<span class = "article-text">在代码运行的过程中首先是新建了一个p1，其中保存的内容是Jerry，在运行到Change方法的时候，系统会新建一个新的变量：p，p的内容和p1是一样的，都是Jerry，再具体的方法体中，修改的内容是p的内容，也就是把p的内容又Jerry改成了Tom，但是p1的内容并没有改变，所以最后输出的结果仍然是Jerry。</span>
+第二种情况：
 
 ```java
 public void changeName(Person p) {
