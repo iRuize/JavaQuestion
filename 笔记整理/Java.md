@@ -474,7 +474,7 @@ changeName(person1);
 System.out.println(person1.name);
 ```
 
-<span class = "article-text">这种情况是直接改变了当前内存地址所指向的内容，所以最后输出的结果是Tom。</span>
+<span class = "article-text">这种情况是直接改变了当前内存地址所指向的内容，所以最后输出的结果是Tom。总结下来就是究竟是改变变量还是改变变量所对应的内存地址。</span>
 
 # JVM
 
