@@ -303,7 +303,6 @@ class Main{
    Person person = mapper.readValue(jsonString, Person.class);
    System.out.println("Person对象: " + person);
 ```
-
 这里需要注意的是使用 JackSon 库进行序列化的结果和 tostring 输出是不一样的
 
 ## 接口和抽象类有什么区别
