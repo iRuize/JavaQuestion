@@ -74,49 +74,7 @@ span.article-text{
 
 # 起言
 
-## 目录划分
-
 <span>开始之前先梳理一下思路，目前学习过的东西已经很多了，把这些“八股文”简单的划分一下。</span>
-
-- Java 通识
-  - Java 的基本数据类型
-  - 函数修饰符
-  - 集合
-  - 多线程
-  - 异常
-  - JVM 虚拟机
-    - 类加载
-- 数据库
-  - Mysql
-  - Redis
-  - MongoDB
-- Spring
-  - SpringMVC（简略）
-  - SpringBoot
-  - SpringCloud
-- 常用的中间件
-  - 消息队列
-    - RabbitMQ
-    - Kafka
-  - 注册中心
-    - Nacos
-    - Dubbo
-  - 搜索中间件
-    - Elasticsearch
-  - 网关
-    - Gateway
-    - Nginx
-- 设计模式
-  - 创建型
-  - 结构型
-  - 行为型
-- 工具
-  - Maven
-  - Git
-  - Jenkins
-- 其他提升
-  - 数据结构
-  - 算法
 
 # Java 通识
 
@@ -303,6 +261,7 @@ class Main{
    Person person = mapper.readValue(jsonString, Person.class);
    System.out.println("Person对象: " + person);
 ```
+
 这里需要注意的是使用 JackSon 库进行序列化的结果和 tostring 输出是不一样的
 
 ## 接口和抽象类有什么区别
@@ -474,6 +433,82 @@ System.out.println(person1.name);
 ```
 
 <span class = "article-text">这种情况是直接改变了当前内存地址所指向的内容，所以最后输出的结果是 Tom。总结下来就是究竟是改变变量还是改变变量所对应的内存地址。</span>
+
+## 文件操作
+
+1. 文件读取
+   文件操作的第一步是通过路径将文件转换成 File 对象
+
+```java
+  String filePath = "C:\\Users\\24336\\Desktop\\文件操作-新建文件夹\\1-2.las";
+  File targetFile = new File(filePath);
+```
+
+<span class = "article-text">之后便可以通过 targetFile 来调用各种 API，最常见的比如获取文件的绝对路径，获取文件名称，文件删除等等。
+
+2. 文件删除
+   1. 常规的文件删除操作
+   2. 利用 FileVisitor 文件访问接口来删除
+
+```java
+    // 常规删除
+    String filePath = "C:\\Users\\24336\\Desktop\\文件操作-新建文件夹\\1-2.las";
+    File targetFile = new File(filePath);
+    targetFile.delete();
+    // FileVisitor操作
+    // Java已经为我们提供了基本的实现类：SimpleFileVisitor<Path>，手动继承该类，然后在实际的遍历方法中添加文件删除操作。
+      /**
+     * 内部类：负责递归删除目录内容
+     */
+    private static class DeleteDirectoryVisitor extends SimpleFileVisitor<Path> {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+            Files.delete(dir);
+            return FileVisitResult.CONTINUE;
+        }
+    }
+    // 删除文件的实际开放接口
+    /**
+     * 删除文件或删除文件夹以及文件夹内的所有内容
+     * @param path 路径字符串（文件或文件夹）
+     * @return true 删除成功；false 删除失败或不存在
+     */
+    public static boolean deleteRecursively(String path) {
+        Path targetPath = Paths.get(path);
+        if (! Files.exists(targetPath)) {
+            System.out.println("路径不存在: " + path);
+            return false;
+        }
+        try {
+            if (Files.isDirectory(targetPath)) {
+                // 递归删除整个目录
+                Files.walkFileTree(targetPath, new DeleteDirectoryVisitor());
+            } else {
+                // 单文件直接删除
+                Files.delete(targetPath);
+            }
+            return true;
+        } catch (IOException e) {
+            System.err.println("删除目录失败: " + e.getMessage());
+            return false;
+        }
+    }
+    //处理完以上内容之后便可以直接调用 deleteRecursively(String path)方法，传入Path路径即可，如果是文件会直接删除，文件夹会删除当前文件夹下的所有内容包括当前文件夹。除此之外，通过FileVisitor我们还可以处理文件的移动，复制，筛选等操作。
+```
+### JavaIO基础
+1. Java中的IO根据实际使用情况大致分可以根据是否为中文类型而分为两类:
+   1. 中文输入输出:字节流->FileInputStream/FileOutputStream
+   2. 非中文输入输出:字符流->FileReader/FileWriter
+   3. 升级版本：缓冲流->BufferedInputStream / BufferedOutputStream / BufferedReader / BufferedWriter
+   4. 数据流：DataInputStream / DataOutputStream
+      1. 通过方法 readInt(), readDouble() 直接读取，不用自己解析字节
+      2. 通过方法 writeInt(), writeUTF() 直接写入，可用于网络传输或二进制文件
 
 # JVM
 
@@ -755,8 +790,9 @@ public class SafeCounter {
 ## SQL 执行很慢如何优化
 
 1. 是否出现了聚合查询，多表查询，查询的数据量是不是很大？有的时候两个普通的查询是比一个级联查询快得多，即使是查询没有用到索引，需要回表。
-  
+
 2. 可以使用 Explain 字段来分析对应的 sql，返回的结果中会有几个需要关注的字段
+
    1. key 和 possible_key，这可以确定当前 sql 使用了哪个索引
 
    2. extra 字段，这是 mysql 自己给出的建议，这里可以看出当前的 sql 是否需回表
