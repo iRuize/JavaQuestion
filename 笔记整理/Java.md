@@ -309,7 +309,7 @@ public abstract class Animal{
 }
 
 public class Dog extends Animal{
-    // 重写抽象父类的抽象方法
+    // 普通类必须实现抽象类中的所有抽象方法
     public void eat(){
         System.out.println("Dog eat");
     }
@@ -333,7 +333,7 @@ abstract class Dog extends Animal {
     // 可以不实现 makeSound()
 }
 
-// 普通类继承抽象子类
+// 普通类继承抽象子类，并且实现抽象类的所有抽象方法
 class Husky extends Dog {
     @Override
     public void makeSound() {
@@ -367,9 +367,10 @@ public class Person implements Serializable{
 public class Child extends Person{
     private String address;
 
-    // 这里的地址可写可不写
+    // 这里的地址address可写可不写
     public Child(String name, int age, String address) {
         super(name,age);
+        this.address = (address != null) ? address : "未知";  // 如果没有提供地址，设置默认值
     }
 }
 ```
@@ -379,11 +380,11 @@ public class Child extends Person{
 ### Java 为什么不支持多继承
 
 <span class = "article-text">Java 不支持多继承，原因是容易出现钻石问题
-<span class = "article-text">比如 B 和 C 一起继承了 A，D 继承了 B 和 C，那么 D 对于同一个方法，B 和 C 有不同的实现，此时会出现歧义。
+<span class = "article-text">比如 B 和 C 一起继承了 A，D 继承了 B 和 C，那么 D 对于同一个方法，B 和 C 中有不同的实现，此时会出现歧义，比如说 B 和 C 中都有 show 方法，如果 D 继承 B 和 C，此时 D 调用 show，Java 就不知道该选择 B 还是 C 得 show 方法了。
 
 #### 追问：接口是否可以多继承
 
-<span class = "article-text">接口可以多继承，因为接口中不包含方法体，只包含方法签名，所以接口可以实现多个接口，但是接口不能继承其他类。
+<span class = "article-text">接口可以多继承，因为接口中不包含方法体，只包含方法签名，所以接口可以实现多个接口，但是接口不能继承其他类。如果 A 接口中有 A 方法，B 接口中也有 A 方法，那么如果 C 继承 AB 接口，到时候只需要实现一次 A 接口即可。
 
 ## Java 中的参数传递机制
 
@@ -402,7 +403,7 @@ change(x);
 System.out.println(x);  // 仍然是 5
 ```
 
-<span class = "article-text">在上述代码中传递的是 x，x 变量代表的是 5，所以在函数中实际是对 5 进行修改，但是在函数执行完毕后，x 的值还是 5，因为传递的是副本，并没有影响到原来的变量。</span>
+<span class = "article-text">值传递，基本数据类型传递的是本身的值，也就是会把 5 赋值给 a，然后方法体内实际上是 a=5，并不改变 x 的值，所以 x 的输出结果还是 5.</span>
 
 ### 引用数据类型值传递
 
@@ -418,7 +419,8 @@ change(p1);
 System.out.println(p1.getName());  // 仍然是 "Jerry"
 ```
 
-<span class = "article-text">在代码运行的过程中首先是新建了一个 p1，其中保存的内容是 Jerry，在运行到 Change 方法的时候，系统会新建一个新的变量：p，p 的内容和 p1 是一样的，都是 Jerry，但是在具体的方法体中，修改的内容是把 p 更换成了 Tom，也就是把 p 的内容从 Jerry 改成了 Tom，但是 p1 的内容并没有改变，所以最后输出的结果仍然是 Jerry。</span>
+<span class = "article-text">引用类型的值传递是传递的内存地址。假设 p1 指向的内存地址是#AABB，那么当方法执行到 change(p1)时，方法内 p 指向的内存地址也是#AABB，但是方法体内的具体操作是新建了一个 Person 对象，现在 p 的内存地址指向的是新的[Tom,20]，所以最终的输出结果是不变的。</span>
+
 第二种情况：
 
 ```java
@@ -432,7 +434,7 @@ changeName(person1);
 System.out.println(person1.name);
 ```
 
-<span class = "article-text">这种情况是直接改变了当前内存地址所指向的内容，所以最后输出的结果是 Tom。总结下来就是究竟是改变变量还是改变变量所对应的内存地址。</span>
+<span class = "article-text">这种情况是当前内存地址指向的值变了，所以结果页对应的改变了。</span>
 
 ## 文件操作
 
@@ -501,14 +503,11 @@ System.out.println(person1.name);
     }
     //处理完以上内容之后便可以直接调用 deleteRecursively(String path)方法，传入Path路径即可，如果是文件会直接删除，文件夹会删除当前文件夹下的所有内容包括当前文件夹。除此之外，通过FileVisitor我们还可以处理文件的移动，复制，筛选等操作。
 ```
-### JavaIO基础
-1. Java中的IO根据实际使用情况大致分可以根据是否为中文类型而分为两类:
-   1. 中文输入输出:字节流->FileInputStream/FileOutputStream
-   2. 非中文输入输出:字符流->FileReader/FileWriter
-   3. 升级版本：缓冲流->BufferedInputStream / BufferedOutputStream / BufferedReader / BufferedWriter
-   4. 数据流：DataInputStream / DataOutputStream
-      1. 通过方法 readInt(), readDouble() 直接读取，不用自己解析字节
-      2. 通过方法 writeInt(), writeUTF() 直接写入，可用于网络传输或二进制文件
+
+### JavaIO 基础
+
+1. Java 中的 IO 体系分为两大类：字节流（8bit）和字符流（16bit），字节流的顶层抽象是 InputStream 和 OutputStream，处理的内容是文件，图片，视频，二进制数据；字符流的顶层抽象是 Reader，Writer，处理的内容是文本，字符，字符串。字节流是万能的，只不过是处理文字有一些麻烦，字符流自带编码处理，对中文较友好，
+   等面试完，再好好补充。251119
 
 # JVM
 
@@ -520,13 +519,16 @@ System.out.println(person1.name);
 4. 程序计数器：存放当前线程执行的字节码的地址。
 5. 本地方法栈：java 可以调用非 java 语言的接口，方法，比如 C、C++等，这存放这些接口的栈信息。
 
+线程私有：栈内存，程序计数器，本地方法栈
+现成共有：堆内存，方法区
+
 ## JVM 的垃圾回收机制
 
 1. 判断那些对象可以回收
    1. 引用计数法
    2. 根可达性分析
 2. 垃圾回收算法
-   1. 标记清除：标记存活对象，清除未标记对象：会产生大量内存碎片，影分配。
+   1. 标记清除：标记存活对象，清除未标记对象：会产生大量内存碎片。
    2. 标记整理：标记所有需要回收的对象，然后让所有存活的对象向一端移后直接清理掉端边界以外的内存，主要应用在老年代。
    3. 复制算法：将内存分为两块，每次只使用其中一块，当这一块内存用完将还存活的对象复制到另一块内存上，然后清理掉第一块内存。
    4. 分代收集：根据对象存活周期将内存划分为不同的区域，不同区域采用收集算法。
@@ -545,22 +547,24 @@ System.out.println(person1.name);
    4. G1 垃圾回收器：基于标记整理算法，适用于大数据量的场景。
    5. ZGC 垃圾回收器：基于复制算法，适用于高性能场景。
 5. MinorGC
-   1. 作用在新生代，可能导致新生代对象晋升老年代
-   2. 触发时机：Eden 区满
-   3. 标记可以清除的对象，采用根可达性分析法
-   4. 复制存存活对象：将伊甸园和 Survivor From 中存活的对象 Survivor To 区或者是老年代，如果一个对象在 Survivor 活了那么也会进入老年代，如果 Survivor 满了，也是直接进入老年代。
-   5. 清空伊甸园和 Survivor From 区，将 Survivor FroSurvivor To 区交换
+   1. 只回收新生代，作用区域是 Eden 区+Survivor 区
+   2. 触发条件：Eden 区满了
+   3. 回收策略：现用 Survivor 区假如是 from，将 Eden 区和 Survivor from 区的存活对象复制到 Survivor To 区，然后将一定年龄的对象晋升到老年代，随后 Eden 区清空，Survivor 两个区互换。
+6. FullGC
+   1. FullGC 主要作用在老年代
+   2. 触发条件：老年代内存不足，MinorGC 之后晋升老年代失败，手动调用 System.gc()
 
 ## JVM 的类加载机制
 
-1. 类加载过程
+类加载过程
+
 1. 加载
    1. 类加载器通过类的全限定类名找到.class 文件，读入后在方法区中创建 Class 对象
-1. 链接
+2. 链接
    1. 验证：确保 class 文件没有安全问题
    2. 准备：给静态变量分配内存，并设置对应的初始值，比如 设置 0，Integer 对应的是 null
    3. 解析：将类方法字段的符号引用转换为直接引用，即内存地址
-1. 初始化
+3. 初始化
    1. 赋予静态变量最终值，并执行 static 代码块
 
 ## 双亲委派
@@ -600,9 +604,16 @@ System.out.println(person1.name);
 2. Set：集合，元素无序、不可重复
 3. Map：映射，元素是键值对，键不可重复
 
-## ArrayList 的扩容机制
+## ArrayList
 
-<span class = "article-text">如果是初始大小为空，设定初始大小为 0，在第一次写入数据的时候会进行扩容到 10；如果设定初始为 0，那么就执行正常的扩容；当数组没有容量的时候才会扩容，新数组的长度是旧数组 1.5 倍，（底层代码是 new_length = length + length >> 1）先创建新的数组，然后执行复制操作，最后销毁旧的数组，整个扩容完成
+### ArrayList 的扩容机制
+
+<span class = "article-text">如果是初始大小为空，则设定初始大小为 0，在第一次写入数据的时候会进行扩容到 10，容量用完之后会扩容 1.5 倍大小。如果设定初始为不为 0，那么就正常的写入数据；当数组没有容量的时候才会扩容，新数组的长度也是旧数组 1.5 倍。（底层代码是 new_length = length + length >> 1）先创建新的数组，然后执行复制操作，最后销毁旧的数组，整个扩容完成
+
+### ArrayList 和 LinkedList 对比
+
+1. 首先 ArrayList 是一块连续的内存空间，LinkedList 是靠指针来来串起来的，内存地址非连续
+2. ArrayList 是查找方便，增删不方便。LinkedList 是增删方便，查找不方便
 
 ## HashMap 相关
 
@@ -617,7 +628,7 @@ System.out.println(person1.name);
 
 ### 重写 equals 方法要不要重写 hashcode 方法？
 
-<span class = "article-text">必须要重写 hashcode 方法。在默认情况下 equals 方法返回的内容是内存地址的文本，hashCode 方法返回的是基于内存地址计算出的整数。如果不重写 hashcode 方法，就会出现两个对象相同，但是 hashCode 却不同，导致 HashMap 的 put 方法无法将两个对象存入同一个桶内。比如新建两个人对象，一个是 23 岁的 John，另一个是 25 岁的 John，重写 equals 方法，仅仅比较名称，此时两个人是一样的，但是 hashcode 是不一样的，与期望相悖。
+<span class = "article-text">必须要重写 hashcode 方法。Java 要求的是如果 equals 相等，那么 hashCode 也必须相等，但是 hashCode 相等，equals 不一定相等。默认情况下 equals 比较的是引用是否相等，返回值是布尔类型，hashCode 方法是根据内存地址生成的整数。在回答该问题时使用一个 hashmap 来举例合适，两个对象内存地址不同，但是表示信息相同，重写了 equals 方法之后，判定两个对象是相同的，他们的 hashcode 也必须相同，分到同一个桶内，然后使用 equals 判断，两者相同，所以不新添加。
 
 ### HashMap 的线程安全问题？
 
@@ -635,18 +646,15 @@ System.out.println(person1.name);
 
 ### 线程安全的原因：
 
-1. 扩容机制：ConcurrentHashMap 使用了 CAS 和 Synchronized 锁机程安全的。
-2. 读操作是无锁的：节点数据是被 Volatile 关键字修饰的。
-3. 写操作：添加数据的时候如果桶为空，仅仅使用 CAS 就可以实现线会出现竞争条件。添加数据时如果桶不为空，需要使用 Synchronized 证线程安全。Synchornized 锁会锁住对应的桶链表的第一个节点，全。
-4. 删除操作：删除数据时如果桶不为空，需要使用 Synchronized 锁线程安全。Synchornized 锁会锁住对应的桶链表的第一个节点，保证线程安全。
+1. ConcurrentHashMap 将整个 Hash 表分成了多个段，不同线程可以同时访问不同的段，只有同时访问一个段的时候才会加锁，这是 JDK7 的操作方法，在 JDK8 中，整体采用 CAS 和 Synchronized 锁 + Volatile 关键字来实现线程安全。
+   1. 添加：如果桶为空，单纯使用 CAS，写入新的数据，如果桶不为空，则在链表头结点或者红黑树根节点加 Synchronized 锁
+   2. 删除：使用 Synchronized 锁锁住头结点，然后进行删除
+   3. 修改：使用 Synchronized 锁锁住头结点，然后进行修改
+   4. 查询：Volatile 关键字会加在桶数组和节点的 Vlaue 字段上
 
 ### ConcurrentHashMap 的扩容机制：
 
-1. sizeCtl = 0.75 _ capacity; // 当前桶数组容量 _ 负载因存储的节点数 size >= sizeCtl 时，就会触发扩容；扩容时，将数来的 2 倍。
-2. 设置扩容状态 sizeCtl = -1; // 负值表示正在扩容
-3. 多个线程一起迁移数据
-4. 将已经迁移完成的桶设置标记 ForwardingNode，并将 Forwardingnext 指针指向新的数组，然后将 ForwardingNode 置为 null，表示迁移完成。
-5. 所有桶迁移完成之后 table 指向新的数组，sizeCtl = 0，表示扩容完成。
+1. 单个桶内数据大于 8 条就会树化，小于 6 条就会回退，ConcurrentHashMap 不关心桶的数量
 
 # 多线程
 
@@ -747,30 +755,6 @@ public class SafeCounter {
 <span class = "article-text">如果当前的值等于旧值，那么就对当前值进行修改，否则什么都不做。这样就可以保障如果在变更值的过程中，其他线程修改了当前值，变更值操作就会失败</span>
 **示例**
 <span class = "article-text">银行转账余额有 1000，想转出 500，余下 500，但是点击确定之前别的操作已经把余额该到了 500，此时就会 CAS 失败，导致转账失败。
-
-## ConcurrentHashMap 为什么是线程安全的
-
-<span class = "article-text">ConcurrentHashMap 是线程安全的，原因是它内部使用了 CAS 和 Synchronized 锁机制来保证线程安全的。</span>
-
-1. 添加数据的时候如果桶为空，仅仅使用 CAS 就可以实现线程安全，不会出现竞争条件。
-   1. 可能出现两个线程同时往桶内写入数据，如果不使用 CAS 就会造成两个数据写入同一个位置，导致数据丢失。
-2. 添加数据时如果桶不为空，需要使用 Synchronized 锁机制，保证线程安全。
-   1. Synchornized 锁会锁住对应的桶链表的第一个节点，保证线程安全。
-3. 读操作是无锁的
-   1. 节点数据是被 Volatile 关键字修饰的
-4. 删除数据时如果桶不为空，需要使用 Synchronized 锁机制，保证线程安全。
-   1. Synchornized 锁会锁住对应的桶链表的第一个节点，保证线程安全。
-5. 删除数据时如果桶为空，不需要操作
-
-### ConcurrentHashMap 的扩容机制
-
-1. sizeCtl = 0.75 _ capacity; // 当前桶数组容量 _ 负载因子，当实际存储的节点数 size >= sizeCtl 时，就会触发扩容；扩容时，将数组扩大为原来的 2 倍。
-2. 设置扩容状态 sizeCtl = -1; // 负值表示正在扩容
-3. 多个线程一起迁移数据
-4. 将已经迁移完成的桶设置标记 ForwardingNode，并将 ForwardingNode 的 next 指针指向新的数组，然后将 ForwardingNode 置为 null，表示迁移完成。
-5. 所有桶迁移完成之后 table 指向新的数组，sizeCtl = 0，表示扩容完成。
-
-<span class = "article-text">ConcurrentHashMap 内部是数组+链表/红黑树的结构（类似于 HashMap），每次只对对应的桶加锁。</span>
 
 ## 线程的生命周期
 
